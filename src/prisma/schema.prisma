@@ -1,0 +1,32 @@
+model Auction {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  images       String[]
+  startingBid  Decimal
+  highestBid   Decimal? @default(0)
+  sellerId     String
+  status       AuctionStatus @default(OPEN)
+  createdAt    DateTime @default(now())
+  endsAt       DateTime
+
+  seller       User @relation(fields: [sellerId], references: [id])
+  bids         Bid[]
+
+}
+
+model Bid {
+  id         String   @id @default(uuid())
+  amount     Decimal
+  auctionId  String
+  bidderId   String
+  createdAt  DateTime @default(now())
+
+  auction    Auction @relation(fields: [auctionId], references: [id])
+  bidder     User @relation(fields: [bidderId], references: [id])
+}
+
+enum AuctionStatus {
+  OPEN
+  CLOSED
+}
