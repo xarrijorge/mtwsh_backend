@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import passport from "passport";
-import { UserRole } from "../models/User";
+import { UserRole } from "@prisma/client";
 
 interface AuthenticatedRequest extends Request {
   user?: {

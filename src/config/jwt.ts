@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { UserRole } from "../models/User";
+import { UserRole } from "@prisma/client" 
 
 dotenv.config();
 
