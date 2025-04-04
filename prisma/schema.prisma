@@ -8,54 +8,254 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  username  String
-  email     String    @unique
-  password  String
-  role      UserRole
-  createdAt DateTime  @default(now())
+  id                String     @id @default(uuid())
+  username          String     @unique
+  email             String     @unique
+  password          String
+  role              UserRole
+  createdAt         DateTime   @default(now())
+  lastLogin         DateTime?
+  isVerified        Boolean    @default(false)
+  profileImage      String?
+  loginCount        Int        @default(0)
 
   // Relations
-  auctions  Auction[] @relation("UserAuctions")
-  bids      Bid[]     @relation("UserBids")
+  auctions          Auction[]  @relation("UserAuctions")
+  bids              Bid[]      @relation("UserBids")
+  addresses         Address[]
+  reviews           Review[]   @relation("ReceivedReviews")
+  reviewsGiven      Review[]   @relation("GivenReviews")
+  watchlist         Watchlist[]
+  notifications     Notification[]
+  transactions      Transaction[] @relation("UserTransactions")
+  paymentMethods    PaymentMethod[]
+  purchases         Transaction[] @relation("UserPurchases")
+}
+
+model Address {
+  id              String    @id @default(uuid())
+  userId          String
+  name            String
+  streetAddress   String
+  city            String
+  state           String?
+  postalCode      String
+  country         String
+  phone           String?
+  isDefault       Boolean   @default(false)
+
+  user            User      @relation(fields: [userId], references: [id])
+  shipments       Shipment[]
+}
+
+model Category {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  description     String?
+  parentId        String?
+  
+  parent          Category? @relation("SubCategories", fields: [parentId], references: [id])
+  subCategories   Category[] @relation("SubCategories")
+  auctions        Auction[]
 }
 
 model Auction {
-  id           String   @id @default(uuid())
-  title        String
-  description  String
-  images       String[]
-  startingBid  Decimal
-  highestBid   Decimal? @default(0)
-  sellerId     String
-  status       AuctionStatus @default(OPEN)
-  createdAt    DateTime @default(now())
-  endsAt       DateTime
+  id              String        @id @default(uuid())
+  title           String
+  description     String
+  condition       ItemCondition @default(NEW)
+  images          String[]
+  startingBid     Decimal       @db.Decimal(10, 2)
+  buyNowPrice     Decimal?      @db.Decimal(10, 2)
+  reservePrice    Decimal?      @db.Decimal(10, 2)
+  minBidIncrement Decimal       @default(1.00) @db.Decimal(10, 2)
+  highestBid      Decimal?      @default(0) @db.Decimal(10, 2)
+  sellerId        String
+  currentBidderId String?       // added for performance optimization
+  categoryId      String?
+  status          AuctionStatus @default(OPEN)
+  createdAt       DateTime      @default(now())
+  endsAt          DateTime
+  featured        Boolean       @default(false)
+  views           Int           @default(0)
+  
+  // Tags as an array of strings
+  tags            String[]
 
-  seller       User     @relation("UserAuctions", fields: [sellerId], references: [id])
-  bids         Bid[]
+  // Relations
+  seller          User          @relation("UserAuctions", fields: [sellerId], references: [id])
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  bids            Bid[]
+  watchlistedBy   Watchlist[]
+  transaction     Transaction?
+  shipment        Shipment?
 }
 
 model Bid {
-  id         String   @id @default(uuid())
-  amount     Decimal
-  auctionId  String
-  bidderId   String
-  createdAt  DateTime @default(now())
+  id              String    @id @default(uuid())
+  amount          Decimal   @db.Decimal(10, 2)
+  auctionId       String
+  bidderId        String
+  createdAt       DateTime  @default(now())
+  status          BidStatus @default(ACTIVE)
+  bidderIp        String?   // optional fraud detection
 
-  auction    Auction @relation(fields: [auctionId], references: [id])
-  bidder     User     @relation("UserBids", fields: [bidderId], references: [id])
+  auction         Auction   @relation(fields: [auctionId], references: [id])
+  bidder          User      @relation("UserBids", fields: [bidderId], references: [id])
 }
 
+model Transaction {
+  id              String           @id @default(uuid())
+  auctionId       String           @unique
+  sellerId        String
+  buyerId         String
+  amount          Decimal          @db.Decimal(10, 2)
+  fee             Decimal?         @db.Decimal(10, 2) // platform cut
+  discount        Decimal?         @db.Decimal(10, 2) // optional discount
+  status          TransactionStatus @default(PENDING)
+  paymentMethodId String?
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
 
+  auction         Auction          @relation(fields: [auctionId], references: [id])
+  seller          User             @relation("UserTransactions", fields: [sellerId], references: [id])
+  buyer           User             @relation("UserPurchases", fields: [buyerId], references: [id])
+  paymentMethod   PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
+  shipment        Shipment?
+}
+
+model PaymentMethod {
+  id              String    @id @default(uuid())
+  userId          String
+  type            PaymentType
+  provider        String
+  accountNumber   String?
+  expiryDate      DateTime?
+  isDefault       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id])
+  transactions    Transaction[]
+}
+
+model Shipment {
+  id              String        @id @default(uuid())
+  transactionId   String        @unique
+  auctionId       String        @unique
+  addressId       String
+  trackingNumber  String?
+  carrier         String?
+  status          ShipmentStatus @default(PENDING)
+  deliveryEstimate DateTime?     // optional delivery estimation
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  transaction     Transaction   @relation(fields: [transactionId], references: [id])
+  auction         Auction       @relation(fields: [auctionId], references: [id])
+  address         Address       @relation(fields: [addressId], references: [id])
+}
+
+model Review {
+  id              String    @id @default(uuid())
+  reviewerId      String
+  userId          String
+  transactionId   String?
+  rating          Int       @db.SmallInt
+  comment         String?
+  createdAt       DateTime  @default(now())
+
+  reviewer        User      @relation("GivenReviews", fields: [reviewerId], references: [id])
+  user            User      @relation("ReceivedReviews", fields: [userId], references: [id])
+}
+
+model Watchlist {
+  id              String    @id @default(uuid())
+  userId          String
+  auctionId       String
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id])
+  auction         Auction   @relation(fields: [auctionId], references: [id])
+
+  @@unique([userId, auctionId])
+}
+
+model Notification {
+  id              String           @id @default(uuid())
+  userId          String
+  type            NotificationType
+  message         String
+  auctionId       String?
+  isRead          Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+
+  user            User             @relation(fields: [userId], references: [id])
+}
+
+enum ItemCondition {
+  NEW
+  USED_LIKE_NEW
+  USED_VERY_GOOD
+  USED_GOOD
+  USED_ACCEPTABLE
+  FOR_PARTS
+  REFURBISHED
+  OPEN_BOX
+}
 
 enum UserRole {
-  buyer
-  seller
-  admin
+  BUYER
+  SELLER
+  ADMIN
 }
 
 enum AuctionStatus {
+  DRAFT
   OPEN
   CLOSED
+  SOLD
+  CANCELED
+}
+
+enum BidStatus {
+  ACTIVE
+  OUTBID
+  WINNING
+  REJECTED
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  COMPLETED
+  REFUNDED
+  DISPUTED
+  CANCELED
+}
+
+enum PaymentType {
+  CREDIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  CRYPTO
+  MPESA
+  OTHER_MOBILE_MONEY
+}
+
+enum ShipmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  RETURNED
+}
+
+enum NotificationType {
+  OUTBID
+  AUCTION_ENDING
+  AUCTION_WON
+  PAYMENT_RECEIVED
+  ITEM_SHIPPED
+  REVIEW_RECEIVED
+  SYSTEM
 }
