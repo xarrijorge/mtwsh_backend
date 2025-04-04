@@ -46,6 +46,26 @@ export const getAuctionById = async (req, res) => {
   }
 };
 
+
+export const getAuctionsBySellerID = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const auctions = await prisma.auction.findMany({
+      where: { status: "OPEN", sellerId: id },
+      include: { bids: true },
+    });
+
+    if (auctions.length === 0)
+      return res.status(404).json({ message: "No auctions found for this seller" });
+
+    return res.json(auctions);
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching auctions", error });
+  }
+}
+
+
+
 export const placeBid = async (req, res) => {
   try {
     const { id } = req.params;
@@ -72,6 +92,24 @@ export const placeBid = async (req, res) => {
     return res.status(201).json(bid);
   } catch (error) {
     return res.status(500).json({ message: "Error placing bid", error });
+  }
+};
+
+export const getBidsByBidderId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const bids = await prisma.bid.findMany({
+      where: { bidderId: id },
+      include: { auction: true },
+    });
+
+    if (bids.length === 0)
+      return res.status(404).json({ message: "No bids found for this bidder" });
+
+    return res.json(bids);
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching bids", error });
   }
 };
 

@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import passport from "./config/passport";
 import authRoutes from "./routes/authRoutes";
+import auctionRoutes from "./routes/auctionRoutes";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/auctions", auctionRoutes);
 
 const PORT = process.env.PORT || 5000;
 

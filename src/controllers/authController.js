@@ -1,14 +1,10 @@
-import { Request, Response } from "express";
+import { PrismaClient } from '@prisma/client';
 import bcrypt from "bcryptjs";
 import { generateToken } from "../config/jwt";
-import { User, UserRole } from "../models/User";
 
-let users: User[] = []; // Temporary in-memory storage
+const prisma = new PrismaClient();
 
-export const registerUser = async (
-  req: Request<{},{},{ username: string; email: string; password: string; role: UserRole }>,
-  res: Response
-) => {
+export const registerUser = async ( req, res) => {
   try {
     const { username, email, password, role } = req.body;
 
@@ -16,36 +12,33 @@ export const registerUser = async (
       return res.status(400).json({ message: "Invalid role specified." });
     }
 
-    const existingUser = users.find((user) => user.email === email);
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser: User = {
-      id: String(users.length + 1),
-      username,
-      email,
-      password: hashedPassword,
-      role,
-    };
-
-    users.push(newUser);
-
+    const newUser = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+        role,
+      }
+    })
     const token = generateToken(newUser.id, newUser.role); // 🔹 Fix: Now includes role
+
     return res.status(201).json({ user: { id: newUser.id, username, email, role }, token });
   } catch (error) {
     return res.status(500).json({ message: "Server Error" });
   }
 };
 
-export const loginUser = async (
-  req: Request<{},{},{ email: string; password: string }>,
-  res: Response
-) => {
+export const loginUser = async ( req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = users.find((user) => user.email === email);
+    const user = await prisma.user.findUnique({ where: { email } }); 
+
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
