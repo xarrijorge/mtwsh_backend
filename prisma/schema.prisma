@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "./node_modules/@prisma/client"
 }
 
 datasource db {
@@ -34,14 +35,15 @@ model User {
 }
 
 model SellerProfile {
-  id           String     @id @default(uuid())
-  userId       String     @unique
-  type         SellerType
-  storeName    String?
-  bio          String?
-  location     String?
-  contactPhone String?
-  rating       Float?     @default(0)
+  id              String     @id @default(uuid())
+  userId          String     @unique
+  type            SellerType
+  storeName       String?
+  bio             String?
+  location        String?
+  contactPhone    String?
+  rating          Float?     @default(0)
+  defaultCurrency Currency   @default(KES)
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -87,11 +89,12 @@ model Auction {
   sellerId        String
   currentBidderId String?
   categoryId      String?
-  status          AuctionStatus @default(OPEN)
+  status          AuctionStatus @default(PENDING_APPROVAL)
   createdAt       DateTime      @default(now())
   endsAt          DateTime
   featured        Boolean       @default(false)
   views           Int           @default(0)
+  currency        Currency      @default(KES)
 
   tags String[]
 
@@ -232,6 +235,7 @@ enum AuctionStatus {
   CLOSED
   SOLD
   CANCELED
+  PENDING_APPROVAL
 }
 
 enum BidStatus {
@@ -275,4 +279,11 @@ enum NotificationType {
   ITEM_SHIPPED
   REVIEW_RECEIVED
   SYSTEM
+}
+
+enum Currency {
+  KES
+  USD
+  EUR
+  GBP
 }
